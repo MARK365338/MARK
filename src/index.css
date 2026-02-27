@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --color-duo-green: #58cc02;
+  --color-duo-green-dark: #46a302;
+  --color-duo-blue: #1cb0f6;
+  --color-duo-blue-dark: #1899d6;
+  --color-duo-yellow: #ffc800;
+  --color-duo-yellow-dark: #e5a400;
+  --color-duo-orange: #ff9600;
+  --color-duo-red: #ff4b4b;
+  --color-duo-gray: #afafaf;
+  --color-duo-gray-light: #e5e5e5;
+  --color-duo-bone: #f7f7f7;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-[#4b4b4b] font-sans antialiased;
+  }
+}
+
+@layer components {
+  .duo-button-primary {
+    @apply relative bg-duo-green text-white font-bold py-3 px-6 rounded-2xl border-b-4 border-duo-green-dark active:border-b-0 active:translate-y-1 transition-all text-center cursor-pointer;
+  }
+  
+  .duo-button-secondary {
+    @apply relative bg-white text-duo-blue font-bold py-3 px-6 rounded-2xl border-2 border-duo-gray-light border-b-4 active:border-b-2 active:translate-y-0.5 transition-all text-center cursor-pointer;
+  }
+
+  .duo-card {
+    @apply bg-white rounded-2xl border-2 border-duo-gray-light p-4 shadow-sm;
+  }
+}
