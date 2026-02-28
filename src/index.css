@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --color-duo-green: #58cc02;
@@ -33,5 +34,14 @@
 
   .duo-card {
     @apply bg-white rounded-2xl border-2 border-duo-gray-light p-4 shadow-sm;
+  }
+
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s infinite ease-in-out;
   }
 }

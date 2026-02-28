@@ -3,7 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { 
+  GoogleGenAI, 
+  Type,
+  GenerateContentResponse
+} from "@google/genai";
+import React, { useState, useEffect, useRef } from 'react';
+import Markdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, 
@@ -25,7 +31,15 @@ import {
   Sparkles,
   Send,
   Trash2,
-  Edit3
+  Edit3,
+  BookOpen,
+  Star,
+  Lock,
+  Gift,
+  Heart,
+  BrainCircuit,
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { User, Question, BattleState } from './types';
 
@@ -119,27 +133,59 @@ const MOCK_QUESTIONS: Question[] = [
 
 // --- Components ---
 
+// --- Utilities ---
+const playPopSound = () => {
+  const audio = new Audio('https://www.soundjay.com/buttons/sounds/button-37a.mp3');
+  audio.volume = 0.2;
+  audio.play().catch(() => {}); // Ignore errors if browser blocks autoplay
+};
+
 const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (t: string) => void }) => {
   const tabs = [
-    { id: 'home', icon: Home, label: '首页' },
-    { id: 'ai', icon: Bot, label: 'AI 答疑' },
-    { id: 'friends', icon: Users, label: '好友' },
-    { id: 'profile', icon: UserIcon, label: '我的' },
+    { id: 'home', icon: Home, label: '首页', color: 'bg-[#ff4b4b]', borderColor: 'border-[#d33131]', iconColor: 'text-white', boxColor: 'bg-[#e5f6ff]' },
+    { id: 'learn', icon: BookOpen, label: '学习', color: 'bg-[#58cc02]', borderColor: 'border-[#46a302]', iconColor: 'text-white', boxColor: 'bg-[#ddf4ff]' },
+    { id: 'ai', icon: Bot, label: 'AI 答疑', color: 'bg-[#ffc800]', borderColor: 'border-[#e5a400]', iconColor: 'text-white', boxColor: 'bg-[#fff4d1]' },
+    { id: 'friends', icon: Users, label: '好友', color: 'bg-[#ff86d0]', borderColor: 'border-[#e35da8]', iconColor: 'text-white', boxColor: 'bg-[#ffebf7]' },
+    { id: 'profile', icon: UserIcon, label: '我的', color: 'bg-[#ce82ff]', borderColor: 'border-[#a560d8]', iconColor: 'text-white', boxColor: 'bg-[#f3e8ff]' },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t-2 border-duo-gray-light px-6 py-2 flex justify-between items-center z-50">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t-2 border-duo-gray-light px-2 py-3 flex justify-around items-center z-50">
       {tabs.map((tab) => (
-        <button
+        <motion.button
           key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
-          className={`flex flex-col items-center p-2 transition-colors ${
-            activeTab === tab.id ? 'text-duo-blue' : 'text-duo-gray'
-          }`}
+          whileTap={{ scale: 0.8 }}
+          onClick={() => {
+            setActiveTab(tab.id);
+            playPopSound();
+          }}
+          className="relative flex flex-col items-center group"
         >
-          <tab.icon size={24} strokeWidth={activeTab === tab.id ? 3 : 2} />
-          <span className="text-[10px] font-bold mt-1 uppercase tracking-wider">{tab.label}</span>
-        </button>
+          <div className={`w-14 h-12 rounded-2xl flex items-center justify-center transition-all border-2 ${
+            activeTab === tab.id 
+              ? `${tab.color} ${tab.borderColor} shadow-[0_4px_0_0_rgba(0,0,0,0.1)]` 
+              : `bg-transparent border-transparent`
+          }`}>
+            <div className={`p-1.5 rounded-lg ${activeTab === tab.id ? 'bg-white/20' : ''}`}>
+              <tab.icon 
+                size={28} 
+                strokeWidth={3} 
+                className={activeTab === tab.id ? 'text-white' : 'text-duo-gray'} 
+              />
+            </div>
+          </div>
+          <span className={`text-[10px] font-black mt-1 transition-colors ${
+            activeTab === tab.id ? 'text-duo-blue' : 'text-duo-gray'
+          }`}>
+            {tab.label}
+          </span>
+          {activeTab === tab.id && (
+            <motion.div 
+              layoutId="nav-indicator"
+              className="absolute -bottom-1 w-2 h-2 bg-duo-blue rounded-full"
+            />
+          )}
+        </motion.button>
       ))}
     </nav>
   );
@@ -403,22 +449,198 @@ const FriendsPage = ({ onChallenge, friends, onDeleteFriend }: { onChallenge: (u
   );
 };
 
-const AIQuestionPage = () => {
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([
-    { role: 'ai', text: '你好！我是你的金蝉助教。有什么金融备考难题需要我帮你解答吗？' }
-  ]);
+const LearningPage = () => {
+  const lessons = [
+    { id: 1, title: '棋子移动', status: 'completed', icon: Star, offset: 0, color: 'bg-[#58cc02]', shadow: 'shadow-[0_8px_0_0_#46a302]' },
+    { id: 2, title: '基础走法', status: 'completed', icon: Star, offset: -40, color: 'bg-[#58cc02]', shadow: 'shadow-[0_8px_0_0_#46a302]' },
+    { id: 3, title: '特殊规则', status: 'current', icon: Star, offset: 40, color: 'bg-[#58cc02]', shadow: 'shadow-[0_8px_0_0_#46a302]' },
+    { id: 4, title: '练习', status: 'locked', icon: Zap, offset: -60, color: 'bg-[#00cd9c]', shadow: 'shadow-[0_8px_0_0_#00a881]' },
+    { id: 5, title: '宝箱奖励', status: 'locked', icon: Gift, offset: 0, color: 'bg-[#ffc800]', shadow: 'shadow-[0_8px_0_0_#e5a400]', isChest: true },
+    { id: 6, title: '进阶战术', status: 'locked', icon: Star, offset: 40, color: 'bg-[#58cc02]', shadow: 'shadow-[0_8px_0_0_#46a302]' },
+    { id: 7, title: '阶段测试', status: 'locked', icon: Trophy, offset: 80, color: 'bg-[#58cc02]', shadow: 'shadow-[0_8px_0_0_#46a302]' },
+  ];
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    const userMsg = input;
-    setMessages([...messages, { role: 'user', text: userMsg }]);
+  return (
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* Top Stats Bar (Duolingo Style) */}
+      <div className="flex justify-between items-center px-6 py-4 sticky top-0 bg-white z-40 border-b border-duo-gray-light">
+        <div className="flex items-center gap-1">
+          <Trophy size={20} className="text-[#00cd9c]" fill="currentColor" />
+        </div>
+        <div className="flex items-center gap-1">
+          <Flame size={20} className="text-[#ff9600]" fill="currentColor" />
+          <span className="font-black text-[#afafaf]">0</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Zap size={20} className="text-[#1cb0f6]" fill="currentColor" />
+          <span className="font-black text-[#1cb0f6]">193</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Heart size={20} className="text-[#ff4b4b]" fill="currentColor" />
+          <span className="font-black text-[#ff4b4b]">25</span>
+        </div>
+      </div>
+
+      {/* Section Header (Rounded Green Box) */}
+      <div className="px-4 py-4">
+        <div className="bg-[#00cd9c] rounded-3xl p-6 text-white shadow-[0_8px_0_0_#00a881] relative overflow-hidden">
+          <p className="text-lg font-black opacity-80 uppercase tracking-wide">第 1 阶段，第 1 部分</p>
+          <h2 className="text-2xl font-black mt-1">棋子移动</h2>
+        </div>
+      </div>
+
+      {/* Learning Path */}
+      <div className="flex-1 pb-40 pt-8 relative">
+        {/* Character (Oscar) */}
+        <div className="absolute right-4 top-1/3 z-20 pointer-events-none">
+          <motion.img 
+            initial={{ x: 50, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            src="https://api.dicebear.com/7.x/avataaars/svg?seed=Oscar&mouth=serious&top=shortHair&hairColor=black&facialHair=moustaches&facialHairColor=black&clothing=shirtVNeck&clothingColor=pink" 
+            className="w-32 h-32"
+            alt="Character"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+
+        <div className="max-w-md mx-auto flex flex-col items-center space-y-16">
+          {lessons.map((lesson) => (
+            <div 
+              key={lesson.id} 
+              className="relative flex flex-col items-center"
+              style={{ transform: `translateX(${lesson.offset}px)` }}
+            >
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={playPopSound}
+                className={`w-20 h-20 rounded-full flex items-center justify-center relative z-10 transition-all ${lesson.shadow} ${
+                  lesson.status === 'locked' 
+                    ? 'bg-[#e5e5e5] shadow-[0_8px_0_0_#afafaf] text-[#afafaf]' 
+                    : `${lesson.color} text-white`
+                } ${lesson.status === 'current' ? 'animate-bounce-subtle' : ''}`}
+              >
+                {lesson.isChest ? (
+                  <div className="flex flex-col items-center">
+                    <div className="w-16 h-12 bg-[#ffc800] rounded-lg border-4 border-white shadow-sm relative">
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white" />
+                    </div>
+                  </div>
+                ) : (
+                  <lesson.icon size={36} fill={lesson.status !== 'locked' ? 'currentColor' : 'none'} />
+                )}
+              </motion.button>
+              
+              {/* Path Line (Dashed/Solid) */}
+              {lesson.id < lessons.length && (
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 w-2 h-16 bg-[#e5e5e5] -z-0" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Floating Down Arrow */}
+        <div className="fixed bottom-24 right-6 z-40">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="w-14 h-14 bg-white rounded-2xl shadow-[0_4px_0_0_#e5e5e5] border-2 border-[#e5e5e5] flex items-center justify-center text-[#1cb0f6]"
+          >
+            <ChevronRight size={32} className="rotate-90" />
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AIQuestionPage = ({ user }: { user: typeof MOCK_USER }) => {
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai', text: string, isTest?: boolean }[]>([
+    { role: 'ai', text: '你好！我是你的金蝉助教。我可以为你提供深度解析、个性化反馈，或者为你生成一套针对性的模拟练习题。你想聊聊什么？' }
+  ]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const callGemini = async (prompt: string, systemInstruction: string) => {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: prompt,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+      return response.text;
+    } catch (error) {
+      console.error("Gemini API Error:", error);
+      return "抱歉，我现在有点忙，请稍后再试。";
+    }
+  };
+
+  const handleSend = async (customPrompt?: string) => {
+    const textToSend = customPrompt || input;
+    if (!textToSend.trim() || isLoading) return;
+
+    const newMessages = [...messages, { role: 'user' as const, text: textToSend }];
+    setMessages(newMessages);
     setInput('');
+    setIsLoading(true);
+
+    const systemInstruction = `你是一个专业的金融备考助教“金蝉”。
+    你的目标是帮助用户准备金融考试（如CFA, FRM等）。
+    当前用户信息：等级 ${user.level}, 经验值 ${user.xp}。
     
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'ai', text: `关于“${userMsg}”，这是一个非常经典的考点。在 CFA 一级中，我们通常需要关注其核心定义和计算公式...` }]);
-    }, 1000);
+    你的能力包括：
+    1. 深度解析：提供详细的金融概念解释，包含背景、公式、应用场景。
+    2. 个性化反馈：根据用户的提问，指出其知识盲点并给出学习建议。
+    3. 模拟测试：如果用户要求测试，生成高质量的选择题。
+    
+    请使用亲切、专业且富有激励性的语气。使用 Markdown 格式输出。`;
+
+    const aiResponse = await callGemini(textToSend, systemInstruction);
+    
+    setMessages([...newMessages, { role: 'ai', text: aiResponse || "抱歉，我无法生成回复。" }]);
+    setIsLoading(false);
+  };
+
+  const generateTest = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setMessages(prev => [...prev, { role: 'user', text: "请为我生成一套针对当前水平的模拟测试题。" }]);
+
+    const systemInstruction = `你是一个专业的金融备考助教“金蝉”。
+    请为用户生成一套包含3道高质量金融选择题的模拟测试。
+    题目应涵盖：资产定价、风险管理、伦理准则等。
+    每道题应包含：题干、4个选项（A, B, C, D）、正确答案及详细解析。
+    使用 Markdown 格式，确保排版清晰。`;
+
+    const aiResponse = await callGemini("生成3道模拟题", systemInstruction);
+    setMessages(prev => [...prev, { role: 'ai', text: aiResponse || "无法生成测试题。", isTest: true }]);
+    setIsLoading(false);
+  };
+
+  const getFeedback = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setMessages(prev => [...prev, { role: 'user', text: "请根据我的学习进度给我一些个性化反馈。" }]);
+
+    const systemInstruction = `你是一个专业的金融备考助教“金蝉”。
+    基于用户的当前状态（等级 ${user.level}, XP ${user.xp}），提供一段个性化的学习反馈。
+    分析其可能的优势和需要加强的地方，并推荐接下来的学习重点。
+    语气要积极向上，像一个贴心的导师。`;
+
+    const aiResponse = await callGemini("提供学习反馈", systemInstruction);
+    setMessages(prev => [...prev, { role: 'ai', text: aiResponse || "无法生成反馈。" }]);
+    setIsLoading(false);
   };
 
   const suggestions = [
@@ -430,7 +652,7 @@ const AIQuestionPage = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-112px)] bg-duo-bone/30">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, i) => (
           <motion.div 
             key={i}
@@ -438,7 +660,7 @@ const AIQuestionPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[80%] p-4 rounded-2xl font-bold shadow-sm border-2 ${
+            <div className={`max-w-[85%] p-4 rounded-2xl font-bold shadow-sm border-2 ${
               msg.role === 'user' 
                 ? 'bg-duo-blue text-white border-duo-blue-dark rounded-tr-none' 
                 : 'bg-white text-[#4b4b4b] border-duo-gray-light rounded-tl-none'
@@ -449,18 +671,43 @@ const AIQuestionPage = () => {
                   <span className="text-[10px] uppercase tracking-wider">金蝉 AI 助教</span>
                 </div>
               )}
-              <p className="text-sm leading-relaxed">{msg.text}</p>
+              <div className={`text-sm leading-relaxed prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}`}>
+                <Markdown>{msg.text}</Markdown>
+              </div>
             </div>
           </motion.div>
         ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-white p-4 rounded-2xl border-2 border-duo-gray-light flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin text-duo-blue" />
+              <span className="text-xs font-bold text-duo-gray">金蝉正在思考...</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-4 bg-white border-t-2 border-duo-gray-light space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <button 
+            onClick={generateTest}
+            disabled={isLoading}
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-duo-green/10 text-duo-green border-2 border-duo-green/20 rounded-xl text-xs font-black hover:bg-duo-green/20 transition-colors"
+          >
+            <FileText size={14} /> 生成模拟考
+          </button>
+          <button 
+            onClick={getFeedback}
+            disabled={isLoading}
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-duo-blue/10 text-duo-blue border-2 border-duo-blue/20 rounded-xl text-xs font-black hover:bg-duo-blue/20 transition-colors"
+          >
+            <BrainCircuit size={14} /> 获取学习建议
+          </button>
           {suggestions.map((s, i) => (
             <button 
               key={i}
               onClick={() => setInput(s)}
+              disabled={isLoading}
               className="whitespace-nowrap px-3 py-1.5 bg-duo-bone border-2 border-duo-gray-light rounded-full text-xs font-bold text-duo-gray hover:border-duo-blue hover:text-duo-blue transition-colors"
             >
               {s}
@@ -475,12 +722,18 @@ const AIQuestionPage = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            disabled={isLoading}
           />
           <button 
-            onClick={handleSend}
-            className="bg-duo-blue p-3 rounded-xl text-white shadow-sm border-b-4 border-duo-blue-dark active:border-b-0 active:translate-y-1 transition-all"
+            onClick={() => handleSend()}
+            disabled={isLoading || !input.trim()}
+            className={`p-3 rounded-xl transition-all border-b-4 ${
+              input.trim() && !isLoading 
+                ? 'bg-duo-blue text-white shadow-sm border-duo-blue-dark active:border-b-0 active:translate-y-1' 
+                : 'bg-duo-gray-light text-duo-gray border-duo-gray cursor-not-allowed'
+            }`}
           >
-            <Send size={20} />
+            {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
           </button>
         </div>
       </div>
@@ -727,9 +980,14 @@ export default function App() {
               />
             </motion.div>
           )}
+          {activeTab === 'learn' && (
+            <motion.div key="learn" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+              <LearningPage />
+            </motion.div>
+          )}
           {activeTab === 'ai' && (
             <motion.div key="ai" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <AIQuestionPage />
+              <AIQuestionPage user={MOCK_USER} />
             </motion.div>
           )}
           {activeTab === 'profile' && (
